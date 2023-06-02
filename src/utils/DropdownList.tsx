@@ -53,7 +53,7 @@ const DropdownList = ({
         onClick={toggleComboBox}
       >
         <span
-          className={`font-normal ${
+          className={`font-normal text-sx sm:text-sm md:text-base ${
             selectedOption ? 'text-black' : 'text-grey-medium'
           }`}
         >

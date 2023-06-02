@@ -19,6 +19,8 @@ import {
   FRENCH,
   NO,
   OUI,
+  POLICY,
+  POLICY_QUESTION,
   YES,
   agreementType,
 } from '../../const';
@@ -45,6 +47,7 @@ const AgreementPage: React.FC = () => {
   const [pause, setPause] = useState<boolean>(false);
   const [transcript, setTranscript] = useState<string>('');
   const [isNotSupported, setNotSupported] = useState<boolean>(false);
+  const [readingPolicy, setReadingPolicy] = useState<boolean>(true);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const validAgreement = useMemo(
@@ -53,6 +56,24 @@ const AgreementPage: React.FC = () => {
   );
 
   useEffect(() => {
+    if ('speechSynthesis' in window) {
+      const speechSynthesis = window.speechSynthesis;
+
+      speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(POLICY + POLICY_QUESTION);
+      utterance.pitch = 1;
+      utterance.rate = 0.8;
+      utterance.lang = 'en-GB';
+
+      utterance.onend = () => {
+        setReadingPolicy(false);
+      };
+      speechSynthesis.speak(utterance);
+    } else {
+      alert('Text-to-speech is not supported in this browser.');
+    }
+
     let recognition: SpeechRecognition | null = null;
 
     if (
@@ -144,6 +165,7 @@ const AgreementPage: React.FC = () => {
 
     return () => {
       if (recognitionRef.current) {
+        speechSynthesis.cancel();
         recognitionRef.current = null;
       }
     };
@@ -215,73 +237,70 @@ const AgreementPage: React.FC = () => {
 
   return (
     <>
-      <p className="text-grey-dark font-normal text-justify mb-5">
-        You understand that by using the site or site services, you agree to be
-        bound by this agreement. If you do not accept this agreement in its
-        entirety, you must not access or use the site or the site services.
-      </p>
+      <p className="text-grey-dark font-normal text-justify mb-5">{POLICY}</p>
       <p className="text-grey-dark font-normal text-justify mb-10">
-        Do you agree to this agreement? Please respond by saying "Yes" or "No".
+        {POLICY_QUESTION}
       </p>
-      {!recording ? (
-        <div className="text-center">
-          <button
-            className={`bg-grey-light rounded-full p-4 ${
-              recognizing ? 'cursor-not-allowed animate-ping' : ''
-            }`}
-            onClick={startRecording}
-          >
-            <MicIcon className="fill-grey-dark text-grey-dark" />
-          </button>
-          {recognizing}
-        </div>
-      ) : (
-        <div>
-          <div className="flex justify-center items-center mb-16">
-            {pause ? (
-              <button
-                className="bg-grey-light rounded-full p-4"
-                onClick={playMedia}
-              >
-                <PauseSharpIcon className="fill-grey-dark" />
-              </button>
-            ) : (
-              <button
-                className="bg-grey-light rounded-full p-4"
-                onClick={playMedia}
-              >
-                <PlaySharpIcon className="fill-grey-dark" />
-              </button>
-            )}
-            <p className="ml-5 font-normal">You responded {transcript}</p>
-          </div>
-          <div className="flex justify-end">
+      {!readingPolicy &&
+        (!recording ? (
+          <div className="text-center">
             <button
-              className="flex justify-center items-center bg-grey-light text-grey-dark py-2 px-5 mr-5"
-              onClick={() => setRecording(false)}
+              className={`bg-grey-light rounded-full p-4 ${
+                recognizing ? 'cursor-not-allowed animate-ping' : ''
+              }`}
+              onClick={startRecording}
             >
-              Retry
-              <ReloadSharpIcon className="ml-5 fill-grey-dark" />
+              <MicIcon className="fill-grey-dark text-grey-dark" />
             </button>
-            <Link
-              to={validAgreement ? '/finished-page' : ''}
-              onClick={handleSave}
-            >
-              <button
-                disabled={Boolean(!validAgreement)}
-                className={`flex justify-center items-center bg-grey-light text-grey-dark py-2 px-5 ${
-                  validAgreement
-                    ? 'cursor-pointer'
-                    : '!active:opacity-25 opacity-25 cursor-not-allowed'
-                }`}
-              >
-                Save
-                <ArrowForwardIcon className="ml-5" />
-              </button>
-            </Link>
+            {recognizing}
           </div>
-        </div>
-      )}
+        ) : (
+          <div>
+            <div className="flex justify-center items-center mb-16">
+              {pause ? (
+                <button
+                  className="bg-grey-light rounded-full p-4"
+                  onClick={playMedia}
+                >
+                  <PauseSharpIcon className="fill-grey-dark" />
+                </button>
+              ) : (
+                <button
+                  className="bg-grey-light rounded-full p-4"
+                  onClick={playMedia}
+                >
+                  <PlaySharpIcon className="fill-grey-dark" />
+                </button>
+              )}
+              <p className="ml-5 font-normal">You responded {transcript}</p>
+            </div>
+            <div className="flex justify-end">
+              <button
+                className="flex justify-center items-center bg-grey-light text-grey-dark py-2 px-5 mr-5"
+                onClick={() => setRecording(false)}
+              >
+                Retry
+                <ReloadSharpIcon className="ml-5 fill-grey-dark" />
+              </button>
+              <Link
+                to={validAgreement ? '/finished-page' : ''}
+                onClick={handleSave}
+              >
+                <button
+                  disabled={Boolean(!validAgreement)}
+                  className={`flex justify-center items-center bg-grey-light text-grey-dark py-2 px-5 ${
+                    validAgreement
+                      ? 'cursor-pointer'
+                      : '!active:opacity-25 opacity-25 cursor-not-allowed'
+                  }`}
+                >
+                  Save
+                  <ArrowForwardIcon className="ml-5" />
+                </button>
+              </Link>
+            </div>
+          </div>
+        ))}
     </>
   );
 };
