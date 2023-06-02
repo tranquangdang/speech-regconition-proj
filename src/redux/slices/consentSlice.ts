@@ -8,7 +8,7 @@ export interface IConsent {
   record: string;
 }
 
-const initialState = {
+export const initialState = {
   consent: {
     id: '',
     name: '',
@@ -16,18 +16,27 @@ const initialState = {
     agree: false,
     record: '',
   },
+  consentList: [] as IConsent[],
+  transcript: '',
 };
 
 export const consentSlice = createSlice({
-  name: 'responsive',
+  name: 'consent',
   initialState,
   reducers: {
     setConsentProp: (state, actions: PayloadAction<IConsent>) => {
       state.consent = actions.payload;
     },
+    setConsentList: (state, actions: PayloadAction<IConsent>) => {
+      state.consentList = [...state.consentList, actions.payload];
+    },
+    setTranscript: (state, actions: PayloadAction<string>) => {
+      state.transcript = actions.payload;
+    },
   },
 });
 
-export const { setConsentProp } = consentSlice.actions;
+export const { setConsentProp, setConsentList, setTranscript } =
+  consentSlice.actions;
 
 export default consentSlice.reducer;

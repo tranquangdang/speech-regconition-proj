@@ -4,23 +4,13 @@ import { ReactComponent as PauseSharpIcon } from '../../assets/pause-sharp.svg';
 import { ReactComponent as CheckIcon } from '../../assets/checkmark-sharp.svg';
 import { ReactComponent as CloseIcon } from '../../assets/close-outline.svg';
 import { IConsent } from '../../redux/slices/consentSlice';
-import { CONSENTS_KEY } from '../../const';
 import { base64ToBlob, capitalizeFirstLetter } from '../../utils/utils';
+import { useAppSelector } from '../../redux/hooks';
 
 const ConsentsPage: React.FC = () => {
+  const { consentList } = useAppSelector((state) => state.consentStore);
+
   const [pauseId, setPauseId] = useState<string>('');
-  const [consentList] = useState<IConsent[]>(() => {
-    let result: IConsent[] = [];
-    try {
-      const rawConsentList = localStorage.getItem(CONSENTS_KEY);
-      if (rawConsentList) {
-        result = JSON.parse(rawConsentList) as IConsent[];
-      }
-    } catch (error) {
-      return [];
-    }
-    return result;
-  });
 
   const playMedia = async (consent: IConsent) => {
     if (consent.record && !pauseId) {

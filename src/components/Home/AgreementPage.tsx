@@ -5,16 +5,19 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ReactComponent as MicIcon } from '../../assets/mic.svg';
 import { ReactComponent as ArrowForwardIcon } from '../../assets/arrow-forward-outline.svg';
 import { ReactComponent as ReloadSharpIcon } from '../../assets/reload-sharp.svg';
 import { ReactComponent as PlaySharpIcon } from '../../assets/play-sharp.svg';
 import { ReactComponent as PauseSharpIcon } from '../../assets/pause-sharp.svg';
 import { useAppSelector } from '../../redux/hooks';
-import { IConsent } from '../../redux/slices/consentSlice';
 import {
-  CONSENTS_KEY,
+  setConsentList,
+  setConsentProp,
+  setTranscript,
+} from '../../redux/slices/consentSlice';
+import {
   ENGLISH,
   FRENCH,
   NO,
@@ -24,7 +27,8 @@ import {
   YES,
   agreementType,
 } from '../../const';
-import { blobToBase64 } from '../../utils/utils';
+import { base64ToBlob, blobToBase64 } from '../../utils/utils';
+import { useDispatch } from 'react-redux';
 
 const getAgreeFromTranscript = (
   str: string,
@@ -40,19 +44,17 @@ const getAgreeFromTranscript = (
 };
 
 const AgreementPage: React.FC = () => {
-  const { consentStore } = useAppSelector((state) => state);
-  const [recording, setRecording] = useState<boolean>(false);
+  const dispatch = useDispatch();
+  const { consent, transcript } = useAppSelector((state) => state.consentStore);
   const [recognizing, setRecognizing] = useState<string>('');
-  const [mediaBlob, setMediaBlob] = useState<Blob | null>(null);
   const [pause, setPause] = useState<boolean>(false);
-  const [transcript, setTranscript] = useState<string>('');
   const [isNotSupported, setNotSupported] = useState<boolean>(false);
   const [readingPolicy, setReadingPolicy] = useState<boolean>(true);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const validAgreement = useMemo(
-    () => getAgreeFromTranscript(transcript, consentStore.consent.language),
-    [transcript, consentStore.consent.language]
+    () => getAgreeFromTranscript(transcript, consent.language),
+    [transcript, consent.language]
   );
 
   useEffect(() => {
@@ -70,10 +72,17 @@ const AgreementPage: React.FC = () => {
         setReadingPolicy(false);
       };
       speechSynthesis.speak(utterance);
+
+      return () => {
+        speechSynthesis.cancel();
+      };
     } else {
+      setReadingPolicy(false);
       alert('Text-to-speech is not supported in this browser.');
     }
+  }, []);
 
+  useEffect(() => {
     let recognition: SpeechRecognition | null = null;
 
     if (
@@ -83,7 +92,7 @@ const AgreementPage: React.FC = () => {
       recognition = new (window.SpeechRecognition ||
         window.webkitSpeechRecognition)();
 
-      if (consentStore.consent.language === FRENCH) {
+      if (consent.language === FRENCH) {
         recognition.lang = 'fr-FR';
       }
       recognition.continuous = false;
@@ -105,9 +114,18 @@ const AgreementPage: React.FC = () => {
                 }
               );
 
-              mediaRecorderRef.current.addEventListener('stop', () => {
+              mediaRecorderRef.current.addEventListener('stop', async () => {
                 const combinedChunks = new Blob(chunks, { type: 'audio/webm' });
-                setMediaBlob(combinedChunks);
+                const record = await blobToBase64(combinedChunks);
+                if (record && typeof record === 'string') {
+                  dispatch(
+                    setConsentProp({
+                      ...consent,
+                      record,
+                    })
+                  );
+                }
+
                 stream.getTracks().forEach((track) => track.stop());
               });
 
@@ -142,8 +160,7 @@ const AgreementPage: React.FC = () => {
         const isFinal = event.results[lastResultIndex].isFinal;
 
         if (isFinal && confidence > 0.5) {
-          setTranscript(result.toLowerCase());
-          setRecording(true);
+          dispatch(setTranscript(result.toLowerCase()));
           recognition?.stop();
           mediaRecorderRef.current?.stop();
         }
@@ -165,11 +182,10 @@ const AgreementPage: React.FC = () => {
 
     return () => {
       if (recognitionRef.current) {
-        speechSynthesis.cancel();
         recognitionRef.current = null;
       }
     };
-  }, [consentStore.consent.language]);
+  }, [consent, consent.language, dispatch]);
 
   const startRecording = useCallback(() => {
     if (
@@ -177,18 +193,20 @@ const AgreementPage: React.FC = () => {
       ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
     ) {
       if (!recognizing) {
+        dispatch(setConsentProp({ ...consent, record: '' }));
+        dispatch(setTranscript(''));
         recognitionRef.current.start();
-        setRecording(false);
       }
     } else {
       setNotSupported(true);
     }
-  }, [recognizing]);
+  }, [consent, dispatch, recognizing]);
 
-  const playMedia = useCallback(() => {
-    if (mediaBlob && !pause) {
+  const playMedia = useCallback(async () => {
+    if (consent.record && !pause) {
       setPause(true);
-      const mediaUrl = URL.createObjectURL(mediaBlob);
+      const recordBlob = await base64ToBlob(consent.record);
+      const mediaUrl = URL.createObjectURL(recordBlob);
       const audioPlayer = new Audio();
       audioPlayer.src = mediaUrl;
       audioPlayer.addEventListener('ended', () => {
@@ -196,36 +214,20 @@ const AgreementPage: React.FC = () => {
       });
       audioPlayer.play();
     }
-  }, [mediaBlob, pause]);
+  }, [consent.record, pause]);
 
   const handleSave = useCallback(async () => {
     if (validAgreement) {
       const result = agreementType[validAgreement];
-      if (mediaBlob) {
-        const newConsent = {
-          ...consentStore.consent,
-          agree: result,
-          record: await blobToBase64(mediaBlob),
-        };
 
-        try {
-          const rawConsentList = localStorage.getItem(CONSENTS_KEY);
-          let consentList: IConsent[] = [];
-          if (rawConsentList) {
-            consentList = JSON.parse(rawConsentList) as IConsent[];
-          }
-          const newConsentList = [...consentList, newConsent];
-          localStorage.setItem(CONSENTS_KEY, JSON.stringify(newConsentList));
-        } catch (error) {
-          localStorage.setItem(CONSENTS_KEY, JSON.stringify([newConsent]));
-        }
-      }
+      const newConsent = {
+        ...consent,
+        agree: result,
+      };
+
+      dispatch(setConsentList(newConsent));
     }
-  }, [consentStore.consent, mediaBlob, validAgreement]);
-
-  if (!consentStore.consent.id) {
-    return <Navigate to="/" />;
-  }
+  }, [consent, dispatch, validAgreement]);
 
   if (isNotSupported) {
     return (
@@ -242,7 +244,7 @@ const AgreementPage: React.FC = () => {
         {POLICY_QUESTION}
       </p>
       {!readingPolicy &&
-        (!recording ? (
+        (!transcript || !consent.record ? (
           <div className="text-center">
             <button
               className={`bg-grey-light rounded-full p-4 ${
@@ -272,12 +274,17 @@ const AgreementPage: React.FC = () => {
                   <PlaySharpIcon className="fill-grey-dark" />
                 </button>
               )}
-              <p className="ml-5 font-normal">You responded {transcript}</p>
+              <p className="ml-5 font-normal">
+                You responded {transcript ?? 'unknown'}
+              </p>
             </div>
             <div className="flex justify-end">
               <button
                 className="flex justify-center items-center bg-grey-light text-grey-dark py-2 px-5 mr-5"
-                onClick={() => setRecording(false)}
+                onClick={() => {
+                  dispatch(setConsentProp({ ...consent, record: '' }));
+                  dispatch(setTranscript(''));
+                }}
               >
                 Retry
                 <ReloadSharpIcon className="ml-5 fill-grey-dark" />

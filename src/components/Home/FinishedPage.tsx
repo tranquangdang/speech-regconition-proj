@@ -1,13 +1,15 @@
-import { Link, Navigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ReactComponent as FinishedIcon } from '../../assets/finished.svg';
-import { useAppSelector } from '../../redux/hooks';
+import { useAppDispatch } from '../../redux/hooks';
+import { useEffect } from 'react';
+import { initialState, setConsentProp } from '../../redux/slices/consentSlice';
 
 const FinishedPage: React.FC = () => {
-  const { consentStore } = useAppSelector((state) => state);
+  const dispatch = useAppDispatch();
 
-  if (!consentStore.consent.id) {
-    return <Navigate to="/" />;
-  }
+  useEffect(() => {
+    dispatch(setConsentProp(initialState.consent));
+  }, [dispatch]);
 
   return (
     <div className="text-center w-3/4 m-auto">

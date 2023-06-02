@@ -7,16 +7,20 @@ export interface IOption {
 }
 
 const DropdownList = ({
+  defaultValue,
   className,
   options,
   onSelect,
 }: {
+  defaultValue: IOption | null;
   className: string;
   options: IOption[];
   onSelect: (option: IOption) => void;
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedOption, setSelectedOption] = useState<IOption | null>(null);
+  const [selectedOption, setSelectedOption] = useState<IOption | null>(
+    defaultValue
+  );
   const dropDownListRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
