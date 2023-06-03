@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-  useMemo,
-} from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { ReactComponent as MicIcon } from '../../assets/mic.svg';
 import { ReactComponent as ArrowForwardIcon } from '../../assets/arrow-forward-outline.svg';
@@ -52,10 +46,7 @@ const AgreementPage: React.FC = () => {
   const [readingPolicy, setReadingPolicy] = useState<boolean>(true);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const validAgreement = useMemo(
-    () => getAgreeFromTranscript(transcript, consent.language),
-    [transcript, consent.language]
-  );
+  const validAgreement = getAgreeFromTranscript(transcript, consent.language);
 
   useEffect(() => {
     if ('speechSynthesis' in window) {
@@ -187,7 +178,7 @@ const AgreementPage: React.FC = () => {
     };
   }, [consent, consent.language, dispatch]);
 
-  const startRecording = useCallback(() => {
+  const startRecording = () => {
     if (
       recognitionRef.current &&
       ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
@@ -200,9 +191,9 @@ const AgreementPage: React.FC = () => {
     } else {
       setNotSupported(true);
     }
-  }, [consent, dispatch, recognizing]);
+  };
 
-  const playMedia = useCallback(async () => {
+  const playMedia = async () => {
     if (consent.record && !pause) {
       setPause(true);
       const recordBlob = await base64ToBlob(consent.record);
@@ -214,9 +205,9 @@ const AgreementPage: React.FC = () => {
       });
       audioPlayer.play();
     }
-  }, [consent.record, pause]);
+  };
 
-  const handleSave = useCallback(async () => {
+  const handleSave = async () => {
     if (validAgreement) {
       const result = agreementType[validAgreement];
 
@@ -227,7 +218,7 @@ const AgreementPage: React.FC = () => {
 
       dispatch(setConsentList(newConsent));
     }
-  }, [consent, dispatch, validAgreement]);
+  };
 
   if (isNotSupported) {
     return (
